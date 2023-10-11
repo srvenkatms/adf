@@ -1,0 +1,4 @@
+using 'datafactory.bicep'
+
+param dataFactoryName = '<<yourdatafactoryname>>'
+

@@ -1,0 +1,42 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- <<your branch>>
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  workingDir: $(Build.Repository.LocalPath)/
+  serviceConnection: '<<yourservice connection name>>' 
+  subscriptionId: '<<your azure subscriptionid>>'
+stages:
+  - stage: build
+    displayName: 'Build Bicep'
+    jobs:
+      - job:
+        
+        steps:
+          # building bicep into ARM
+        - task: AzureCLI@2  
+          displayName: 'Build bicep artifact' 
+          inputs: 
+            azureSubscription: $(serviceConnection)
+            scriptType: 'pscore'  
+            scriptLocation: 'inlineScript'  
+            inlineScript: |
+              $file = "$(Build.SourcesDirectory)/datafactory.bicep"    
+              $paramfile  = "$(Build.SourcesDirectory)/datafactoryparams.bicepparam"        
+              New-Item -ItemType Directory -Force -Path $(build.artifactstagingdirectory)/infrastructure
+              az bicep build --file $file --outdir $(build.artifactstagingdirectory)/infrastructure
+              az bicep build-params --file $paramfile --outfile $(build.artifactstagingdirectory)/infrastructure/datafactoryparams.params.json
+
+        - task: PublishPipelineArtifact@1
+          inputs:
+            targetPath: '$(build.artifactstagingdirectory)'
+            artifact: 'datafactory'
+            publishLocation: 'pipeline'
+
