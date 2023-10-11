@@ -1,0 +1,72 @@
+
+trigger:
+- <<your branch>>
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  workingDir: $(Build.Repository.LocalPath)/
+  serviceConnection: '<<your service conection>>' 
+  subscriptionId: '<<your subscription>>'
+  devResourceGroup: '<<yourDevResourceGroupName>>'
+  location: 'eastus'
+stages:
+  - stage: build
+    displayName: 'Build Bicep'
+    jobs:
+      - job:
+        
+        steps:
+          # building bicep into ARM
+        - task: AzureCLI@2  
+          displayName: 'Build bicep artifact' 
+          inputs: 
+            azureSubscription: $(serviceConnection)
+            scriptType: 'pscore'  
+            scriptLocation: 'inlineScript'  
+            inlineScript: |
+              $file = "$(Build.SourcesDirectory)/datafactory.bicep"    
+              $paramfile  = "$(Build.SourcesDirectory)/datafactoryparams.bicepparam"        
+              New-Item -ItemType Directory -Force -Path $(build.artifactstagingdirectory)/infrastructure
+              az bicep build --file $file --outdir $(build.artifactstagingdirectory)/infrastructure
+              az bicep build-params --file $paramfile --outfile $(build.artifactstagingdirectory)/infrastructure/datafactoryparams.params.json
+
+        - task: PublishPipelineArtifact@1
+          inputs:
+            targetPath: '$(build.artifactstagingdirectory)'
+            artifact: 'datafactory'
+            publishLocation: 'pipeline'
+  - stage: 'development'
+    displayName: 'Deploy to development'
+    dependsOn: build
+  
+    jobs: 
+    - deployment: DeployToDevelopment
+      pool:
+        vmImage: 'ubuntu-latest'
+      environment: development 
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - task: DownloadPipelineArtifact@2 #downloading artifacts created in build stage
+                inputs:
+                  source: 'current'
+                  path: '$(Pipeline.Workspace)'
+
+              - task: AzureResourceManagerTemplateDeployment@3
+                displayName: Creating ADF Infrastructure by IaC
+                inputs:
+                  deploymentScope: 'Resource Group'
+                  azureResourceManagerConnection: '$(serviceConnection)'
+                  subscriptionId: '$(subscriptionId)'
+                  action: 'Create Or Update Resource Group'
+                  resourceGroupName: '$(devResourceGroup)'
+                  location: '$(location)'
+                  templateLocation: 'Linked artifact'
+                  csmFile:  '$(Pipeline.Workspace)/datafactory/infrastructure/datafactory.json'
+                  csmParametersFile:  '$(Pipeline.Workspace)/datafactory/infrastructure/datafactoryparams.params.json'
+                  #overrideParameters: -dataFactoryName $(dataFactoryName) -environment development
+                  deploymentMode: 'Incremental'
+                  deploymentOutputs: 'ArmOutputs'
