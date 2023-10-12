@@ -1,0 +1,61 @@
+name: Release-$(rev:r)
+
+trigger:
+  branches:
+    include:
+    - adf_publish
+
+
+variables:
+  - group: 'kvtest'
+  - group: 'ADFAppDevVar'
+  - group: 'TestDBConn'
+ 
+stages:
+- stage: Release
+  displayName: Release stage
+  jobs:
+    - job: Release
+      displayName: Release job
+      pool:
+        vmImage: 'Windows-2019'
+
+      steps:
+        - task: AzurePowerShell@5
+          displayName: Stop Triggers
+          inputs:
+            azureSubscription: '$(azureSubscription)'
+            ScriptType: 'InlineScript'
+            Inline: 
+              $triggersADF = Get-AzDataFactoryV2Trigger -DataFactoryName   
+              "$(DeployDataFactoryName)" -ResourceGroupName "$(DeploymentResourceGroupName)";
+              $triggersADF | ForEach-Object { Stop-AzDataFactoryV2Trigger –
+              ResourceGroupName "$(DeploymentResourceGroupName)" -DataFactoryName   
+              "$(DeployDataFactoryName)" -Name $_.name -Force }
+            azurePowerShellVersion: 'LatestVersion'
+
+        - task: AzureResourceManagerTemplateDeployment@3
+          displayName: 'Deploying ADF Artificats'
+          inputs:
+            deploymentScope: 'Resource Group'
+            azureResourceManagerConnection: <<svc connection>>
+            subscriptionId: <<sub id>>
+            action: 'Create Or Update Resource Group'
+            resourceGroupName: 'RG-CEI-Datafactory-Test'
+            location: 'eastus'
+            templateLocation: 'Linked artifact'
+            csmFile: '$(System.DefaultWorkingDirectory)/$(SourceDataFactoryName)/ARMTemplateForFactory.json'
+            csmParametersFile: '"$(System.DefaultWorkingDirectory)/$(SourceDataFactoryName)/ARMTemplateParametersForFactory.json'
+            overrideParameters: '-factoryName $(DeployDataFactoryName) -ADFCExcercise1-BlobLinkedService_connectionString  $(storage-account-connection-string)'
+            #overrideParameters: '-factoryName $(DeployDataFactoryName) -ADFCExcercise1-SQLLinkedService_connectionString $(TestSQLServer) -ADFCExcercise1-BlobLinkedService_connectionString $(storageconnectionstring)'
+            deploymentMode: 'Incremental'
+     
+        - task: AzurePowerShell@5
+          displayName: Restart Triggers
+          inputs:
+            azureSubscription: '$(azureSubscription)'
+            ScriptType: 'InlineScript'
+            Inline: 
+              $triggersADF = Get-AzDataFactoryV2Trigger -DataFactoryName   "$(DeployDataFactoryName)" -ResourceGroupName "$(DeploymentResourceGroupName)";
+              $triggersADF | ForEach-Object { Start-AzDataFactoryV2Trigger -ResourceGroupName "$(DeploymentResourceGroupName)" -DataFactoryName "$(DeployDataFactoryName)" -Name $_.name -Force }
+            azurePowerShellVersion: 'LatestVersion'
