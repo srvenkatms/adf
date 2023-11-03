@@ -1,0 +1,86 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+#Excercise1
+trigger:
+- none
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  #- group: 'kvtest'
+  - name: workingDir
+    value: $(Build.Repository.LocalPath)/
+  - name: serviceConnection
+    value: 'srvenkat' 
+  - name: subscriptionId
+    value: 'ac616a3b-53be-4cbf-961c-5467b1590718'
+  - name: devRG
+    value: 'RG-CEI-Datafactory1'
+  - name: testRG
+    value: 'RG-CEI-Datafactory-Test'
+stages:
+  - stage: build
+    displayName: 'Build MI Bicep'
+    jobs:
+      - job:
+        
+        steps:
+          # building bicep into ARM
+        - task: AzureCLI@2  
+          displayName: 'Build bicep artifact' 
+          inputs: 
+            azureSubscription: $(serviceConnection)
+            scriptType: 'pscore'  
+            scriptLocation: 'inlineScript'  
+            inlineScript: |
+              $file = "$(Build.SourcesDirectory)/datafactorygen.bicep"    
+              $paramfile  = "$(Build.SourcesDirectory)/datafactorygen.bicepparam"     
+             
+              New-Item -ItemType Directory -Force -Path $(build.artifactstagingdirectory)/infrastructure
+              
+              az bicep build --file $file --outdir $(build.artifactstagingdirectory)/infrastructure
+              az bicep build-params --file $paramfile --outfile $(build.artifactstagingdirectory)/infrastructure/datafactorygen.params.json
+ 
+        - task: PublishPipelineArtifact@1
+          inputs:
+            targetPath: '$(build.artifactstagingdirectory)'
+            artifact: 'datafactory'
+            publishLocation: 'pipeline'
+  
+  - stage: development
+    displayName: 'Development MI deploy'
+    dependsOn: build
+    jobs: 
+    - deployment: DeployToDevelopment
+      environment: MI 
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - script: echo 'Deploying $(devRG)'
+              - task: DownloadPipelineArtifact@2 #downloading artifacts created in build stage
+                inputs:
+                  source: 'current'
+                  path: '$(Pipeline.Workspace)'
+              
+             
+              - task: AzureResourceManagerTemplateDeployment@3
+                displayName: Creating Dev ADF Infrastructure
+                inputs:
+                  deploymentScope: 'Resource Group'
+                  azureResourceManagerConnection: '$(serviceConnection)'
+                  subscriptionId: '$(subscriptionId)'
+                  action: 'Create Or Update Resource Group'
+                  resourceGroupName: '$(devRG)'
+                  location: 'eastus'
+                  templateLocation: 'Linked artifact'
+                  csmFile:  '$(Pipeline.Workspace)/datafactory/infrastructure/datafactorygen.json'
+                  csmParametersFile:  '$(Pipeline.Workspace)/datafactory/infrastructure/datafactorygen.params.json'
+                  #overrideParameters: -dataFactoryName $(dataFactoryName) -environment development
+                  deploymentMode: 'Incremental'
+                  deploymentOutputs: 'ArmOutputs'
+  
+  
