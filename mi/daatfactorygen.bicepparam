@@ -39,3 +39,5 @@ param secretName = 'ORCL-AWS-RDS-DV-PY' // The name of the secret in the Key Vau
 
 // Flag to indicate whether a new SQL Server should be created
 param SqlServernew = true
+
+param subscriptionId  = 'ac616a3b-53be-4cbf-961c-5467b1590718' // need for mi
