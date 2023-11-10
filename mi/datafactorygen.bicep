@@ -250,11 +250,14 @@ resource factoryName_SqlDatabaseLinkedService 'Microsoft.DataFactory/factories/l
 }
 
 // Define the Managed Identity credential for the Data Factory
+
 resource factoryName_Datastdumi 'Microsoft.DataFactory/factories/credentials@2018-06-01' = {
   name: '${factoryName}/Datastdumi'
   properties: {
     type: 'ManagedIdentity'
-    typeProperties: {}
+    typeProperties: {
+      resourceId: '/subscriptions/${subscriptionId}/resourcegroups/${resourceGroupName}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/adfusermi'
+    }
   }
   dependsOn: []
 }
