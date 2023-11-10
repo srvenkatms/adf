@@ -1,3 +1,19 @@
+/*
+This Bicep file defines the resources for a data processing solution in Azure. 
+
+It includes the following resources:
+- Parameters for the deployment, including location, environment, project name, repository name, account name, collaboration branch, root folder, host name, tenant, and various service names.
+- A Managed Identity for the Data Factory.
+- A Storage Account for storing data.
+- A Data Factory for orchestrating and automating data movement and transformation.
+- A SQL Server and SQL Database for storing and managing structured data.
+- A Key Vault for storing secrets.
+- Linked Services for the Key Vault, SQL Database, Azure Blob Storage, and an AWS RDS Oracle database in the Data Factory.
+
+Each resource is defined with its necessary properties and dependencies. The Linked Services are configured with the necessary connection strings, credentials, and other properties for connecting to the respective services. The Managed Identity is used for authenticating the Data Factory with the services it connects to.
+
+Please replace the placeholders in the parameters and properties with your actual values before deploying this Bicep file.
+*/
 // Define the location of the resource group
 param location string = resourceGroup().location
 
